@@ -4,6 +4,7 @@ require 'pg'
 set :bind, '0.0.0.0'
 set :port, 4567
 
+#Going to be killed for having a password written right here
 $database_password = 'AvyQji-VR-9Ndwh'
 $host = 'localhost'
 $port = '5432'
@@ -14,6 +15,10 @@ get '/get-all' do
     connection = PG.connect(:host => $host, :port => $port, :dbname => $database_name, :user => $database_user, :password => $database_password)
 
     entries = connection.exec "SELECT * FROM \"progLanguages\".languages"
+
+    if entries.result_status == 0
+        return "There is no entry"
+    end
 
     entries.map do |entry|
         JSON[entry] + "\n"
@@ -26,6 +31,10 @@ get '/get' do
     value_to_look_for = params["name"]
     entry = connection.exec "SELECT * FROM \"progLanguages\".languages WHERE name = \'#{value_to_look_for}\'"
     
+    if entry.values.length == 0
+        return "Could not find #{value_to_look_for} in database"
+    end
+
     entry.map do |value|
         JSON[value]
     end
