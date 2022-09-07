@@ -29,6 +29,11 @@ get '/get' do
     connection = PG.connect(:host => $database_host, :port => $database_port, :dbname => $database_name, :user => $database_user, :password => $database_password)
 
     name_to_look_for = params["name"].downcase
+
+    if !name_to_look_for.match(/^[a-z\s-]{1,20}$/)
+        return "Names can only contain letters, spaces and dashes and must not be longer than 20 characters!"
+    end
+    
     entry = connection.exec "SELECT * FROM \"progLanguages\".languages WHERE lower(name) = \'#{name_to_look_for}\'"
     
     if entry.values.length == 0
@@ -49,11 +54,11 @@ post '/add' do
         return "The given creation date is not in the format yyyy-mm-dd!"
     end
 
-    if !name.match(/^[a-zA-z\s-]{1,20}$/)
+    if !name.match(/^[a-zA-Z\s-]{1,20}$/)
         return "Names must not contain characters other than letters, spaces and dashes(-) and can have 20 characters at most"
     end
 
-    if !founder.match(/^[a-zA-z\s-]{1,20}$/)
+    if !founder.match(/^[a-zA-Z\s-]{1,20}$/)
         return "Founders must not contain characters other than letters, spaces and dashes(-) and can have 20 characters at most"
     end
 
