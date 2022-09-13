@@ -5,7 +5,7 @@ require 'yaml'
 $config = YAML.load_file('config/config.yml')['database']
 
 set :bind, '0.0.0.0'
-set :port, 4567
+set :port, 8080
 
 def pg_client
   PG.connect(:host => $config['host'], :port => $config['port'], :dbname => $config['name'], :user => $config['user'], :password => $config['password'])
@@ -73,4 +73,8 @@ post '/delete' do
   result = pg_client.exec "DELETE FROM \"progLanguages\".languages WHERE lower(name) = \'#{name}\'"
 
   result.res_status(result.result_status)
+end
+
+get '/' do
+  "The Application is up and running!"
 end
