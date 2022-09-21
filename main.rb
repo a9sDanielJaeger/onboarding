@@ -7,12 +7,42 @@ $config = YAML.load_file('config/config.yml')['database']
 set :bind, '0.0.0.0'
 set :port, 8080
 
+def find_service_key_in_json(data)
+  service_name = ""
+  data.keys.each do |next_key|
+    service_name = next_key if next_key.include?('postgresql')
+  end
+
+  service_name
+end
+
+def setup_database(connection)
+  connection.exec "CREATE SCHEMA IF NOT EXISTS \"progLanguages\""
+  connection.exec "CREATE TABLE IF NOT EXISTS \"progLanguages\".languages  (name VARCHAR ( 20 ) PRIMARY KEY, creation_date date NOT NULL, founder VARCHAR ( 20 ) NOT NULL);"
+end
+
 def pg_client
-  PG.connect(:host => $config['host'], :port => $config['port'], :dbname => $config['name'], :user => $config['user'], :password => $config['password'])
+  if ENV["VCAP_SERVICES"].nil?
+    connection = PG.connect(:host => $config["host"], :port => $config["port"], :dbname => $config["name"], :user => $config["user"], :password => $config["password"])
+    setup_database(connection)
+    connection
+  else
+    data = JSON.parse(ENV["VCAP_SERVICES"])
+    service_name = find_service_key_in_json(data)
+    raise Exception.new "no database service found" if service_name.empty?
+    connection = PG.connect(:host => data[service_name][0]["credentials"]["host"], :port => data[service_name][0]["credentials"]["port"], :dbname => data[service_name][0]["credentials"]["name"], :user => data[service_name][0]["credentials"]["username"], :password => data[service_name][0]["credentials"]["password"])
+    setup_database(connection)
+    connection
+  end
 end
 
 get '/get-all' do
-    entries = pg_client.exec "SELECT * FROM \"progLanguages\".languages"
+    begin
+      entries = pg_client.exec "SELECT * FROM \"progLanguages\".languages"
+    rescue Exception => e
+      status 500
+      return e.message
+    end
 
     status 404
     return "There is no entry" if entries.result_status == 0
@@ -30,7 +60,12 @@ get '/get' do
     status 400
     return "Names can only contain letters, spaces and dashes and must not be longer than 20 characters!" unless name_to_look_for.match(/^[a-z\s-]{1,20}$/)
     
-    entry = pg_client.exec "SELECT * FROM \"progLanguages\".languages WHERE lower(name) = \'#{name_to_look_for}\'"
+    begin
+      entry = pg_client.exec "SELECT * FROM \"progLanguages\".languages WHERE lower(name) = \'#{name_to_look_for}\'"
+    rescue Exception => e
+      status 500
+      return e.message
+    end
     
     status 404
     return "Could not find #{name_to_look_for} in database" if entry.values.length == 0
@@ -52,7 +87,13 @@ post '/add' do
     founder = params["founder"]
     return "Founders must not contain characters other than letters, spaces and dashes(-) and can have 20 characters at most" unless founder.match(/^[a-zA-Z\s-]{1,20}$/)
 
-    connection = pg_client
+    connection = nil
+    begin
+      connection = pg_client
+    rescue Exception => e
+      status 500
+      return e.message
+    end
     result = connection.exec "SELECT * FROM \"progLanguages\".languages WHERE name = \'#{name}\'"
 
     return "Programming language already exists!" if result.values.length > 0
@@ -70,7 +111,12 @@ end
 post '/delete' do
   name = params["name"].downcase
 
-  result = pg_client.exec "DELETE FROM \"progLanguages\".languages WHERE lower(name) = \'#{name}\'"
+  begin
+    result = pg_client.exec "DELETE FROM \"progLanguages\".languages WHERE lower(name) = \'#{name}\'"
+  rescue Exception => e
+    status 500
+    return e.message
+  end
 
   result.res_status(result.result_status)
 end
