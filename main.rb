@@ -122,5 +122,5 @@ post '/delete' do
 end
 
 get '/' do
-  "The Application is up and running!!"
+  "The Application is up and running! Hurray!"
 end
